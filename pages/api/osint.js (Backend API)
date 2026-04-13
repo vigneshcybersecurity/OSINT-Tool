@@ -1,0 +1,56 @@
+import fetch from 'node-fetch';
+import * as cheerio from 'cheerio';
+
+function extract(text) {
+  const emails = [...new Set(text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}/g) || [])];
+  const phones = [...new Set(text.match(/\+?\d[\d\s\-]{8,}\d/g) || [])];
+  return { emails, phones };
+}
+
+export default async function handler(req, res) {
+  const target = req.query.target;
+  if (!target) return res.status(400).json({ error: 'Missing target' });
+
+  const query = `${target} contact email phone`;
+  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+
+  const sources = [];
+  const emails = new Set();
+  const phones = new Set();
+
+  try {
+    const r = await fetch(searchUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const html = await r.text();
+    const $ = cheerio.load(html);
+
+    const links = $('a');
+    for (let i = 0; i < links.length && sources.length < 5; i++) {
+      const href = $(links[i]).attr('href');
+      if (href && href.startsWith('/url?q=')) {
+        const url = href.split('/url?q=')[1].split('&')[0];
+        if (url.startsWith('http')) sources.push(url);
+      }
+    }
+
+    for (const url of sources) {
+      try {
+        const r2 = await fetch(url);
+        const t = await r2.text();
+        const { emails: e, phones: p } = extract(t);
+        e.forEach(x => emails.add(x));
+        p.forEach(x => phones.add(x));
+      } catch {}
+    }
+
+    res.json({
+      emails: [...emails],
+      phones: [...phones],
+      sources
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch' });
+  }
+}
