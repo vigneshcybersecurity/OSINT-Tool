@@ -1,0 +1,51 @@
+import { useState } from 'react';
+
+export default function Home() {
+  const [target, setTarget] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const scan = async () => {
+    setLoading(true);
+    const res = await fetch(`/api/osint?target=${encodeURIComponent(target)}`);
+    const data = await res.json();
+    setResult(data);
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ padding: 30 }}>
+      <h1>🕵️ OSINT Lead Finder</h1>
+
+      <input
+        placeholder="Enter company or domain"
+        value={target}
+        onChange={(e) => setTarget(e.target.value)}
+        style={{ width: 300, padding: 8 }}
+      />
+
+      <button onClick={scan} style={{ marginLeft: 10 }}>Scan</button>
+
+      {loading && <p>Scanning...</p>}
+
+      {result && (
+        <div>
+          <h3>📧 Emails</h3>
+          <ul>
+            {result.emails.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+
+          <h3>📞 Phones</h3>
+          <ul>
+            {result.phones.map((p, i) => <li key={i}>{p}</li>)}
+          </ul>
+
+          <h3>🌐 Sources</h3>
+          <ul>
+            {result.sources.map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
